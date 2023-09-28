@@ -1,0 +1,309 @@
+---
+title: "Testing REST API integrations in Micronaut applications using WireMock"
+date: 2023-09-28T09:39:58+05:30
+draft: false
+description: This guide will explain how to test REST API integrations in a Micronaut application using Testcontainers WireMock module.
+repo: https://github.com/testcontainers/tc-guide-testing-rest-api-integrations-in-micronaut-apps-using-wiremock
+languages:
+  - Java
+tags:
+  - micronaut
+  - rest-api
+  - wiremock
+---
+:toc:
+:toclevels: 2
+:codebase: https://raw.githubusercontent.com/testcontainers/tc-guide-testing-rest-api-integrations-in-micronaut-apps-using-wiremock/main
+
+In this guide, you will learn how to
+
+* Create a Micronaut application which talks to external REST APIs
+* Test the external API integration using Testcontainers WireMock module
+
+== Prerequisites
+* Java 17+
+* Your favorite IDE (Intellij IDEA, Eclipse, NetBeans, VS Code)
+* A Docker environment supported by Testcontainers https://www.testcontainers.org/supported_docker_environment/
+
+== What we are going to achieve in this guide
+We are going to create a Micronaut project which talks to an external REST API.
+Then we will test the external REST API integration using
+the https://testcontainers.com/modules/wiremock/[Testcontainers WireMock module].
+
+== Getting Started
+You can create a new Micronaut project from https://micronaut.io/launch
+[Micronaut Launch] by selecting the *http-client*, *micronaut-test-rest-assured*, and *testcontainers* features.
+
+Assume we are building an application to manage video albums, and we are going to use a 3rd party
+REST API to manage the image and video assets. For this guide, we are going to use a publicly available
+REST API https://jsonplaceholder.typicode.com/ as a 3rd party *photo-service* to store album photos.
+
+We will implement a REST API endpoint to fetch an album for the given *albumId*.
+This API internally talks to the *photo-service* to fetch the photos for that album.
+
+We will use https://wiremock.org/[WireMock], which is a tool for building mock APIs,
+to mock the external service interactions and test our API endpoints.
+Testcontainers provides the https://testcontainers.com/modules/wiremock/[Testcontainers WireMock module]
+so that we can run WireMock as a Docker container.
+
+== Create Album and Photo models
+First, let us create *Album* and *Photo* models using Java records.
+
+[source,java]
+----
+include::{codebase}/src/main/java/com/testcontainers/demo/Album.java[]
+----
+
+We have annotated *Album* and *Photo* records with the *@Serdeable* annotation to allow the types to be serialized or deserialized.
+
+== Create PhotoServiceClient
+Let's create *PhotoServiceClient*, which is a https://docs.micronaut.io/latest/guide/#httpClient[Micronaut declarative HTTP Client], to fetch photos for a given *albumId*.
+
+[source,java]
+----
+include::{codebase}/src/main/java/com/testcontainers/demo/PhotoServiceClient.java[]
+----
+
+We have externalized the photo-service base URL as a configurable property.
+So, let us add the following property in the *src/main/resources/application.properties* file.
+
+[source,properties]
+----
+micronaut.http.services.photosapi.url=https://jsonplaceholder.typicode.com
+----
+
+== Implement API endpoint to get album by id
+Let us implement a REST API endpoint to return an *Album* for the given *albumId* as follows:
+
+[source,java]
+----
+include::{codebase}/src/main/java/com/testcontainers/demo/AlbumController.java[]
+----
+
+Let's understand what is going on in this controller.
+
+* The class is defined as a controller with the *@Controller* annotation mapped to the path */api*.
+* Use constructor injection to inject a bean of type *PhotoServiceClient*.
+* It is critical that any blocking I/O operations (such as fetching the data from the database) are offloaded to a separate thread pool that does not block the Event loop.
+* The *@Get* annotation maps the *getAlbumById()* method to an HTTP GET request on */albums/{albumId}*.
+* You can define path variables with an RFC-6570 URI template in the HTTP Method annotation value. The method argument can optionally be annotated with *@PathVariable*.
+
+
+Our application is exposing a REST API endpoint GET `/api/albums/\{albumId}`
+which internally makes an API call to `https://jsonplaceholder.typicode.com/albums/\{albumId}/photos`
+to get photos of that album and returns a response similar to the following:
+
+[source,json]
+----
+{
+   "albumId": 1,
+   "photos": [
+       {
+           "id": 51,
+           "title": "non sunt voluptatem placeat consequuntur rem incidunt",
+           "url": "https://via.placeholder.com/600/8e973b",
+           "thumbnailUrl": "https://via.placeholder.com/150/8e973b"
+       },
+       {
+           "id": 52,
+           "title": "eveniet pariatur quia nobis reiciendis laboriosam ea",
+           "url": "https://via.placeholder.com/600/121fa4",
+           "thumbnailUrl": "https://via.placeholder.com/150/121fa4"
+       },
+       ...
+       ...
+   ]
+}
+----
+
+You can run the application and access http://localhost:8080/api/albums/1 to see the JSON response.
+
+Now, let us see how we can test the photo-service API integration using *WireMock*.
+
+== Write test for photo-service API integration
+It is better to mock the external API interactions at HTTP protocol level instead of mocking
+the *photoServiceClient.getPhotos(albumId)* method because you will be able to verify any
+marshaling/unmarshalling errors, simulate network latency issues, etc.
+
+Add the *wiremock-standalone* dependency in *pom.xml* as follows:
+
+[source,xml]
+----
+<dependency>
+    <groupId>org.wiremock</groupId>
+    <artifactId>wiremock-standalone</artifactId>
+    <version>3.0.4</version>
+    <scope>test</scope>
+</dependency>
+----
+
+If you are using Gradle, add *wiremock-standalone* dependency in *build.gradle* as follows:
+
+[source,groovy]
+----
+dependencies {
+    ...
+    ...
+    testImplementation("org.wiremock:wiremock-standalone:3.0.4")
+}
+----
+
+Let us write the test for our GET `/api/albums/\{albumId}` API endpoint as follows:
+
+[source,java]
+----
+include::{codebase}/src/test/java/com/testcontainers/demo/AlbumControllerTest.java[]
+----
+
+Let us understand what is going on in this test.
+
+* We have created an instance of WireMock server using *WireMockExtension*.
+* We have registered the *micronaut.http.services.photosapi.url* property pointing to WireMock endpoint URL.
+* In the *shouldGetAlbumById()* test, we have set the expected mock response for `/albums/\{albumId}/photos` API call and make a request to our application endpoint `/api/albums/\{albumId}` and verified the response.
+* We are using the RestAssured library to test our API endpoint, so we captured the random port on which the application started and initialized RestAssured port.
+* Set the expectations for an API call.
+* In the *shouldReturnServerErrorWhenPhotoServiceCallFailed()* test, we have set the expected mock response for `/albums/\{albumId}/photos` API call to return *InternalServerError* status code 500 and make a request to our application endpoint `/api/albums/\{albumId}` and verified the response.
+
+== Stubbing using JSON mapping files
+In the previous test, we saw how to stub an API using *wireMock.stubFor(...)*.
+Instead of stubbing using WireMock Java API, we can use JSON mapping based configuration.
+
+Create *src/test/resources/wiremock/mappings/get-album-photos.json* file as follows:
+
+[source,json]
+----
+include::{codebase}/src/test/resources/wiremock/mappings/get-album-photos.json[]
+----
+
+Next, create *src/test/resources/wiremock/__files/album-photos-resp-200.json* file as follows:
+
+[source,json]
+----
+include::{codebase}/src/test/resources/wiremock/__files/album-photos-resp-200.json[]
+----
+
+Now you can initialize WireMock by loading the stub mappings from mapping files as follows:
+
+[source,java]
+----
+@RegisterExtension
+static WireMockExtension wireMock = WireMockExtension.newInstance()
+     .options(
+         wireMockConfig()
+            .dynamicPort()
+            .usingFilesUnderClasspath("wiremock")
+    )
+    .build();
+----
+
+With mapping files based stubbing in place, you can write tests as follows:
+
+[source,java]
+----
+include::{codebase}/src/test/java/com/testcontainers/demo/AlbumControllerWireMockMappingTests.java[lines="29..43"]
+----
+
+== Using Testcontainers WireMock Module
+
+The https://testcontainers.com/modules/wiremock/[Testcontainers WireMock module] allows provisioning the WireMock server
+as a standalone container within your tests, based on https://github.com/wiremock/wiremock-docker[WireMock Docker].
+
+Let's add *jitpack.io* repository and *wiremock-testcontainers-java* dependency in *pom.xml* as follows:
+
+[source,xml]
+----
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependencies>
+    <dependency>
+        <groupId>com.github.wiremock</groupId>
+        <artifactId>wiremock-testcontainers-java</artifactId>
+        <version>1.0-alpha-7</version>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+----
+
+If you are using Gradle, add *jitpack.io* repository and *wiremock-testcontainers-java* dependency in *build.gradle* as follows:
+
+[source,groovy]
+----
+repositories {
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+}
+
+dependencies {
+    ...
+    ...
+    testImplementation("com.github.wiremock:wiremock-testcontainers-java:1.0-alpha-7")
+}
+----
+
+Create *AlbumControllerTestcontainersTests* and use *WireMockContainer*
+to initialize a wiremock server and stubbing as follows:
+
+[source,java]
+----
+include::{codebase}/src/test/java/com/testcontainers/demo/AlbumControllerTestcontainersTests.java[]
+----
+
+* We are using Testcontainers JUnit 5 Extension annotations *@Testcontainers* and *@Container*
+to initialize *WireMockContainer*.
+* We have configured to load stub mappings from *mocks-config.json* file
+
+Create *src/test/resources/mocks-config.json* file as follows:
+
+[source,json]
+----
+include::{codebase}/src/test/resources/mocks-config.json[]
+----
+
+Next, create *src/test/resources/album-photos-response.json* file as follows:
+
+[source,json]
+----
+include::{codebase}/src/test/resources/album-photos-response.json[]
+----
+
+Now if you run the test, the call to photo API will receive the response using WireMock stubbings
+defined in *mocks-config.json* file.
+
+== Run tests
+
+[source,shell]
+----
+# If you are using Maven
+./mvnw test
+
+# If you are using Gradle
+./gradlew test
+----
+
+Now, if you run your test, you should see in the console log that WireMock Docker instance is started
+which will act as the photo API, serving the mock responses as per the configured expectations and the test should pass.
+
+== Summary
+We have learned how to integrate 3rd party HTTP APIs in a Micronaut application
+and test it using Testcontainers WireMock module.
+
+[TIP]
+====
+Testcontainers WireMock modules are available for *Go* and *Python* languages as well.
+====
+
+For more information on using Testcontainers WireMock module,
+please refer the documentation at https://wiremock.org/docs/solutions/testcontainers/.
+
+To learn more about Testcontainers visit http://testcontainers.com
+
+== Further Reading
+* https://testcontainers.com/guides/testing-rest-api-integrations-using-wiremock/[Testing REST API integrations in Spring Boot application using WireMock]
+* https://testcontainers.com/guides/testing-spring-boot-rest-api-using-testcontainers/[Getting started with Testcontainers in a Java Spring Boot Project]
+* https://testcontainers.com/guides/testing-rest-api-integrations-using-mockserver/[Testing REST API integrations using MockServer]
+* https://testcontainers.com/guides/replace-h2-with-real-database-for-testing/[The simplest way to replace H2 with a real database for testing]

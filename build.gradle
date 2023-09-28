@@ -21,7 +21,7 @@ dependencies {
     testImplementation("io.micronaut.test:micronaut-test-rest-assured")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:testcontainers")
-    testImplementation("org.wiremock:wiremock-standalone:3.0.4")
+    testImplementation("org.wiremock:wiremock-standalone:3.2.0")
     testImplementation("com.github.wiremock:wiremock-testcontainers-java:1.0-alpha-7")
 }
 

@@ -132,7 +132,7 @@ Add the *wiremock-standalone* dependency in *pom.xml* as follows:
 <dependency>
     <groupId>org.wiremock</groupId>
     <artifactId>wiremock-standalone</artifactId>
-    <version>3.0.4</version>
+    <version>3.2.0</version>
     <scope>test</scope>
 </dependency>
 ----
@@ -144,7 +144,7 @@ If you are using Gradle, add *wiremock-standalone* dependency in *build.gradle* 
 dependencies {
     ...
     ...
-    testImplementation("org.wiremock:wiremock-standalone:3.0.4")
+    testImplementation("org.wiremock:wiremock-standalone:3.2.0")
 }
 ----
 

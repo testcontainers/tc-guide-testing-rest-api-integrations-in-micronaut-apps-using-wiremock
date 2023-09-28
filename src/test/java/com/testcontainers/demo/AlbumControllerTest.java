@@ -35,28 +35,27 @@ class AlbumControllerTest {
         try (EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, getProperties())) {
             RestAssured.port = server.getPort();
             Long albumId = 1L;
-            wireMock.stubFor(
-                    WireMock.get(urlMatching("/albums/" + albumId + "/photos"))
-                            .willReturn(
-                                    aResponse()
-                                            .withHeader("Content-Type", MediaType.APPLICATION_JSON)
-                                            .withBody(
-                                                    """
-                                                            [
-                                                                 {
-                                                                     "id": 1,
-                                                                     "title": "accusamus beatae ad facilis cum similique qui sunt",
-                                                                     "url": "https://via.placeholder.com/600/92c952",
-                                                                     "thumbnailUrl": "https://via.placeholder.com/150/92c952"
-                                                                 },
-                                                                 {
-                                                                     "id": 2,
-                                                                     "title": "reprehenderit est deserunt velit ipsam",
-                                                                     "url": "https://via.placeholder.com/600/771796",
-                                                                     "thumbnailUrl": "https://via.placeholder.com/150/771796"
-                                                                 }
-                                                             ]
-                                                            """)));
+            String responseJson =
+                    """
+            [
+                 {
+                     "id": 1,
+                     "title": "accusamus beatae ad facilis cum similique qui sunt",
+                     "url": "https://via.placeholder.com/600/92c952",
+                     "thumbnailUrl": "https://via.placeholder.com/150/92c952"
+                 },
+                 {
+                     "id": 2,
+                     "title": "reprehenderit est deserunt velit ipsam",
+                     "url": "https://via.placeholder.com/600/771796",
+                     "thumbnailUrl": "https://via.placeholder.com/150/771796"
+                 }
+             ]
+            """;
+            wireMock.stubFor(WireMock.get(urlMatching("/albums/" + albumId + "/photos"))
+                    .willReturn(aResponse()
+                            .withHeader("Content-Type", MediaType.APPLICATION_JSON)
+                            .withBody(responseJson)));
 
             given().contentType(ContentType.JSON)
                     .when()

@@ -31,8 +31,8 @@ Then we will test the external REST API integration using
 the https://testcontainers.com/modules/wiremock/[Testcontainers WireMock module].
 
 == Getting Started
-You can create a new Micronaut project from https://micronaut.io/launch
-[Micronaut Launch] by selecting the *http-client*, *micronaut-test-rest-assured*, and *testcontainers* features.
+You can create a new Micronaut project from https://micronaut.io/launch[Micronaut Launch]
+by selecting the *http-client*, *micronaut-test-rest-assured*, and *testcontainers* features.
 
 Assume we are building an application to manage video albums, and we are going to use a 3rd party
 REST API to manage the image and video assets. For this guide, we are going to use a publicly available

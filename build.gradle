@@ -22,7 +22,7 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.wiremock:wiremock-standalone:3.2.0")
-    testImplementation("com.github.wiremock:wiremock-testcontainers-java:1.0-alpha-7")
+    testImplementation("com.github.wiremock:wiremock-testcontainers-java:1.0-alpha-13")
 }
 
 
